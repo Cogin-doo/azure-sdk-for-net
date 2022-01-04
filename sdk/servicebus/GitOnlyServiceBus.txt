@@ -5,3 +5,9 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/Cogin-doo/azu
 git sparse-checkout set sdk/servicebus
 
 git pull
+
+// After that, Tortoise wouldn't work. To fix:
+// delete extension.worktreeconfig from .git/config and integrate the contents of .git/config.worktree into .git/config.
+
+// Also, to get CRLF, configure it globally for git
+// git config --global core.autocrlf true
