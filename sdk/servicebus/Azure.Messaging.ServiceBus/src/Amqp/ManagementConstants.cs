@@ -30,6 +30,7 @@ namespace Azure.Messaging.ServiceBus.Amqp
             public const string RenewSessionLockOperation = Microsoft + ":renew-session-lock";
             public const string SetSessionStateOperation = Microsoft + ":set-session-state";
             public const string GetSessionStateOperation = Microsoft + ":get-session-state";
+            public const string GetAllSessionsOperation = Microsoft + ":get-message-sessions";
             public const string PeekMessageOperation = Microsoft + ":peek-message";
             public const string AddRuleOperation = Microsoft + ":add-rule";
             public const string RemoveRuleOperation = Microsoft + ":remove-rule";
@@ -82,6 +83,10 @@ namespace Azure.Messaging.ServiceBus.Amqp
             public static readonly MapKey ReplyToSessionId = new MapKey("reply-to-session-id");
             public static readonly MapKey ContentType = new MapKey("content-type");
             public static readonly MapKey CorrelationRuleFilterProperties = new MapKey("properties");
+
+            // TODO: added constants
+            public static readonly MapKey LastUpdatedTime = new MapKey("last-updated-time");
+            public static readonly MapKey SessionIds = new MapKey("sessions-ids");
         }
     }
 }

@@ -468,6 +468,44 @@ namespace Azure.Messaging.ServiceBus
             return messages;
         }
 
+        /// Fetches a list of active messages without changing the state of the receiver or the message source.
+        public virtual async Task<List<string>> GetAllSessionsAsync(
+            CancellationToken cancellationToken = default) =>
+            await GetAllSessionsInternalAsync( cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        /// <summary>
+        /// Fetches a list of active messages without changing the state of the receiver or the message source.
+        /// </summary>
+        private async Task<List<string>> GetAllSessionsInternalAsync( CancellationToken cancellationToken)
+        {
+            Argument.AssertNotDisposed(IsClosed, nameof(ServiceBusReceiver));
+            _connection.ThrowIfClosed();
+            cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
+
+//            Logger.PeekMessageStart(Identifier, sequenceNumber, maxMessages);
+            using DiagnosticScope scope = ScopeFactory.CreateScope(
+                DiagnosticProperty.PeekActivityName,
+                DiagnosticScope.ActivityKind.Client);
+            scope.Start();
+
+            List<string> allSessions;
+            try
+            {
+                allSessions = await InnerReceiver.GetAllSessionsAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // TODO: pogrešan exception!
+                Logger.PeekMessageException(Identifier, exception.ToString());
+                scope.Failed(exception);
+                throw;
+            }
+
+//            Logger.PeekMessageComplete(Identifier, messages.Count);
+//            scope.SetMessageData(messages);
+            return allSessions;
+        }
+
         /// <summary>
         /// Opens an AMQP link for use with receiver operations.
         /// </summary>

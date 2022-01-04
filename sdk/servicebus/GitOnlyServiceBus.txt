@@ -2,7 +2,8 @@
 
 git clone --depth 1 --filter=blob:none --sparse https://github.com/Cogin-doo/azure-sdk-for-net
 
-git sparse-checkout set sdk/servicebus
+// Include files from root: /*, but exclude subfolders: !/*/
+git sparse-checkout set sdk/core sdk/servicebus /* !/*/ eng common
 
 git pull
 

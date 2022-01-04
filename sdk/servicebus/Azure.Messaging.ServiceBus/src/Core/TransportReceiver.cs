@@ -207,6 +207,7 @@ namespace Azure.Messaging.ServiceBus.Core
         ///
         /// <returns>The session state as <see cref="BinaryData"/>.</returns>
         public abstract Task<BinaryData> GetStateAsync(CancellationToken cancellationToken);
+        public abstract Task<List<string>> GetAllSessionsAsync(CancellationToken cancellationToken);
 
         /// <summary>
         /// Set a custom state on the session which can be later retrieved using <see cref="GetStateAsync"/>
