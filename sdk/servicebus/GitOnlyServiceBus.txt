@@ -1,0 +1,7 @@
+// This is how to checkout only service bus part of entire SDK
+
+git clone --depth 1 --filter=blob:none --sparse https://github.com/Cogin-doo/azure-sdk-for-net
+
+git sparse-checkout set sdk/servicebus
+
+git pull
