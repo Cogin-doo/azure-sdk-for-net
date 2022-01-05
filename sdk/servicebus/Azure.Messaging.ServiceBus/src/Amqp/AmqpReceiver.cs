@@ -975,53 +975,63 @@ namespace Azure.Messaging.ServiceBus.Amqp
 			throw amqpResponseMessage.ToMessagingContractException();
 		}
 
-		private async Task<List<string>> GetAllSessionsInternal( TimeSpan timeout)
-		{
-			var stopWatch = ValueStopwatch.StartNew();
+        private async Task<List<string>> GetAllSessionsInternal(TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            var stopWatch = ValueStopwatch.StartNew();
 
-			AmqpRequestMessage amqpRequestMessage = AmqpRequestMessage.CreateRequest(
-					ManagementConstants.Operations.GetAllSessionsOperation,
-					timeout,
-					null);
-			amqpRequestMessage.Map[ManagementConstants.Properties.LastUpdatedTime] = DateTime.MinValue;
-			amqpRequestMessage.Map[ManagementConstants.Properties.Skip] = 0;
-			amqpRequestMessage.Map[ManagementConstants.Properties.Top] = 100;
+            var sessionIds = new List<string>();
+            var trackingId = Guid.NewGuid().ToString();
+            var skip = 0;
 
-			if (_receiveLink.TryGetOpenedObject(out ReceivingAmqpLink receiveLink))
-			{
-				amqpRequestMessage.AmqpMessage.ApplicationProperties.Map[ManagementConstants.Request.AssociatedLinkName] = receiveLink.Name;
-			}
+            while (true)
+            {
+                var remainingTimeout = timeout.CalculateRemaining(stopWatch.GetElapsedTime());
+                AmqpRequestMessage amqpRequestMessage = AmqpRequestMessage.CreateRequest(
+                        ManagementConstants.Operations.GetAllSessionsOperation,
+                        remainingTimeout,
+                        trackingId);
+                amqpRequestMessage.Map[ManagementConstants.Properties.LastUpdatedTime] = null;
+                amqpRequestMessage.Map[ManagementConstants.Properties.ServerTimeout] = remainingTimeout.TotalMilliseconds;
+                amqpRequestMessage.Map[ManagementConstants.Properties.Skip] = skip;
+                amqpRequestMessage.Map[ManagementConstants.Properties.Top] = 100;
 
-			RequestResponseAmqpLink link = await _managementLink.GetOrCreateAsync(
-				UseMinimum(_connectionScope.SessionTimeout,
-				timeout.CalculateRemaining(stopWatch.GetElapsedTime())))
-				.ConfigureAwait(false);
-//            cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
+                if (_receiveLink.TryGetOpenedObject(out ReceivingAmqpLink receiveLink))
+                {
+                    amqpRequestMessage.AmqpMessage.ApplicationProperties.Map[ManagementConstants.Request.AssociatedLinkName] = receiveLink.Name;
+                }
 
-			using AmqpMessage responseAmqpMessage = await link.RequestAsync(
-				amqpRequestMessage.AmqpMessage,
-				timeout.CalculateRemaining(stopWatch.GetElapsedTime()))
-				.ConfigureAwait(false);
+                remainingTimeout = timeout.CalculateRemaining(stopWatch.GetElapsedTime());
 
-//            cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
+                var minTimeout = UseMinimum(_connectionScope.SessionTimeout, remainingTimeout);
 
-			AmqpResponseMessage amqpResponseMessage = AmqpResponseMessage.CreateResponse(responseAmqpMessage);
+                RequestResponseAmqpLink link = await _managementLink.GetOrCreateAsync(minTimeout).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
 
-			if (amqpResponseMessage.StatusCode == AmqpResponseStatusCode.OK)
-			{
-                var sessionIds = amqpResponseMessage.GetValue<string[]>( ManagementConstants.Properties.SessionIds );
-                return sessionIds.ToList();
-			}
+                remainingTimeout = timeout.CalculateRemaining(stopWatch.GetElapsedTime());
 
-			if (amqpResponseMessage.StatusCode == AmqpResponseStatusCode.NoContent ||
-				(amqpResponseMessage.StatusCode == AmqpResponseStatusCode.NotFound && Equals(AmqpClientConstants.MessageNotFoundError, amqpResponseMessage.GetResponseErrorCondition())))
-			{
-//                return EmptyList;
-				return new List<string>();
-			}
+                using AmqpMessage responseAmqpMessage = await link.RequestAsync(
+                    amqpRequestMessage.AmqpMessage, remainingTimeout)
+                    .ConfigureAwait(false);
 
-			throw amqpResponseMessage.ToMessagingContractException();
-		}
+                cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
+
+                AmqpResponseMessage amqpResponseMessage = AmqpResponseMessage.CreateResponse(responseAmqpMessage);
+
+                if (amqpResponseMessage.StatusCode == AmqpResponseStatusCode.OK)
+                {
+                    sessionIds.AddRange(amqpResponseMessage.GetValue<string[]>(ManagementConstants.Properties.SessionIds));
+                    skip = amqpResponseMessage.GetValue<int>(ManagementConstants.Properties.Skip);
+                }
+                else if (amqpResponseMessage.StatusCode == AmqpResponseStatusCode.NoContent)
+                {
+                    return sessionIds;
+                }
+                else
+                {
+                    throw amqpResponseMessage.ToMessagingContractException();
+                }
+            }
+        }
 
 		/// <summary>
 		/// Renews the lock on the message. The lock will be renewed based on the setting specified on the queue.
@@ -1163,7 +1173,7 @@ namespace Azure.Messaging.ServiceBus.Amqp
 		public override async Task<List<string>> GetAllSessionsAsync(CancellationToken cancellationToken = default)
 		{
 			return await _retryPolicy.RunOperation(
-				static async (receiver, timeout, _) => await receiver.GetAllSessionsInternal(timeout).ConfigureAwait(false),
+				async (receiver, timeout, _) => await receiver.GetAllSessionsInternal(timeout, cancellationToken).ConfigureAwait(false),
 				this,
 				_connectionScope,
 				cancellationToken).ConfigureAwait(false);

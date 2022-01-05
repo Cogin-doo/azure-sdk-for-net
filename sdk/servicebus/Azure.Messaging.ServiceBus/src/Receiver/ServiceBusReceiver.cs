@@ -468,13 +468,13 @@ namespace Azure.Messaging.ServiceBus
             return messages;
         }
 
-        /// Fetches a list of active messages without changing the state of the receiver or the message source.
+        /// Fetches a list of session IDs.
         public virtual async Task<List<string>> GetAllSessionsAsync(
             CancellationToken cancellationToken = default) =>
             await GetAllSessionsInternalAsync( cancellationToken: cancellationToken).ConfigureAwait(false);
 
         /// <summary>
-        /// Fetches a list of active messages without changing the state of the receiver or the message source.
+        /// Fetches a list of session IDs
         /// </summary>
         private async Task<List<string>> GetAllSessionsInternalAsync( CancellationToken cancellationToken)
         {
@@ -482,7 +482,6 @@ namespace Azure.Messaging.ServiceBus
             _connection.ThrowIfClosed();
             cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
 
-//            Logger.PeekMessageStart(Identifier, sequenceNumber, maxMessages);
             using DiagnosticScope scope = ScopeFactory.CreateScope(
                 DiagnosticProperty.PeekActivityName,
                 DiagnosticScope.ActivityKind.Client);
@@ -501,8 +500,6 @@ namespace Azure.Messaging.ServiceBus
                 throw;
             }
 
-//            Logger.PeekMessageComplete(Identifier, messages.Count);
-//            scope.SetMessageData(messages);
             return allSessions;
         }
 
